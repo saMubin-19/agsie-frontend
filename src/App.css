@@ -1,0 +1,29 @@
+/* ==============================
+   GLOBAL RESET FOR AGSIE DASHBOARD
+   ============================== */
+
+* {
+  box-sizing: border-box;
+}
+
+/* IMPORTANT: Remove Vite default layout limits */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Remove Vite demo styles (NOT needed for dashboard) */
+.logo,
+.card,
+.read-the-docs {
+  display: none;
+}
+
+/* Optional smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
