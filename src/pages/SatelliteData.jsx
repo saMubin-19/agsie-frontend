@@ -40,9 +40,23 @@ function SatelliteData() {
         </div>
 
         <div className="flex items-center gap-4">
-          <select className="select">
-            <option>Last 7 days</option>
-            <option>Last 30 days</option>
+          {/* ✅ FIXED SELECT */}
+          <select
+            className="
+              px-4 py-2 rounded-xl
+              bg-white dark:bg-slate-700
+              text-gray-900 dark:text-white
+              border border-gray-200 dark:border-slate-600
+              focus:ring-2 focus:ring-emerald-500
+              outline-none transition
+            "
+          >
+            <option className="bg-white dark:bg-slate-800 text-gray-900 dark:text-white">
+              Last 7 days
+            </option>
+            <option className="bg-white dark:bg-slate-800 text-gray-900 dark:text-white">
+              Last 30 days
+            </option>
           </select>
 
           <button
@@ -245,6 +259,7 @@ function HistoryRow({ date, value, status }) {
 }
 
 export default SatelliteData;
+
 
 
 
