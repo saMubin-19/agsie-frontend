@@ -18,6 +18,8 @@ import {
   FiDownload,
 } from "react-icons/fi";
 
+import { analyzeField } from "../services/agsieApi"; // 🔥 BACKEND API
+
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import L from "leaflet";
@@ -35,6 +37,8 @@ L.Icon.Default.mergeOptions({
 
 function FieldMap({ setFieldData }) {
   const [areaHa, setAreaHa] = useState(null);
+  const [analysisResult, setAnalysisResult] = useState(null); // 🔥 backend data
+  const [analyzing, setAnalyzing] = useState(false); // 🔥 loading
   const isDark = document.documentElement.classList.contains("dark");
 
   return (
@@ -72,7 +76,6 @@ function FieldMap({ setFieldData }) {
               flex items-center gap-2 px-4 py-2 rounded-xl
               bg-gradient-to-r from-emerald-500 to-green-600
               text-white font-semibold shadow
-              hover:scale-[1.02] transition
             "
           >
             <FiUpload /> Upload GeoJSON
@@ -81,18 +84,6 @@ function FieldMap({ setFieldData }) {
           <div className="relative">
             <FiBell className="text-xl text-gray-600 dark:text-gray-300" />
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold">
-              JF
-            </div>
-            <div className="leading-tight">
-              <p className="text-sm font-semibold">John Farmer</p>
-              <p className="text-xs text-gray-500 dark:text-slate-400">
-                Agricultural Officer
-              </p>
-            </div>
           </div>
         </div>
       </div>
@@ -116,9 +107,19 @@ function FieldMap({ setFieldData }) {
 
           <GlassPanel icon={<FiInfo />} title="Field Info">
             <InfoRow label="Area" value={areaHa ? `${areaHa} ha` : "--"} />
-            <InfoRow label="Crop" value="Rice" />
-            <InfoRow label="Stage" value="Mid-Growth" />
-            <InfoRow label="Soil" value="Clay Loam" />
+            <InfoRow
+              label="NDVI"
+              value={analysisResult?.ndvi_status || "--"}
+            />
+            <InfoRow
+              label="Recommendation"
+              value={analysisResult?.recommendation || "--"}
+            />
+            {analyzing && (
+              <p className="text-xs text-emerald-500 mt-2">
+                Analyzing field…
+              </p>
+            )}
           </GlassPanel>
 
           <button
@@ -188,19 +189,31 @@ function FieldMap({ setFieldData }) {
                     polygon: true,
                   }}
                   edit={{ remove: true }}
-                  onCreated={(e) => {
+                  onCreated={async (e) => {
                     const geojson = e.layer.toGeoJSON();
+
+                    // frontend area calculation
                     const areaSqM = turf.area(geojson);
                     const hectares = (areaSqM / 10000).toFixed(2);
-
                     setAreaHa(hectares);
-                    setFieldData({
-                      areaHa: hectares,
-                      ndvi: 0.72,
-                      soilMoisture: 38,
-                      temperatureC: 34,
-                      geojson,
-                    });
+
+                    try {
+                      setAnalyzing(true);
+
+                      // 🔥 BACKEND ANALYSIS
+                      const result = await analyzeField(geojson);
+                      setAnalysisResult(result);
+
+                      setFieldData({
+                        ...result,
+                        areaHa: hectares,
+                        geojson,
+                      });
+                    } catch (err) {
+                      alert("Backend analysis failed");
+                    } finally {
+                      setAnalyzing(false);
+                    }
                   }}
                 />
               </FeatureGroup>
@@ -283,6 +296,8 @@ function Legend({ color, label }) {
 }
 
 export default FieldMap;
+
+
 
 
 
