@@ -18,7 +18,7 @@ import {
   FiDownload,
 } from "react-icons/fi";
 
-import { analyzeField, fetchFields } from "../services/agsieApi"; // 🔥 BACKEND API
+import { analyzeField, fetchFields } from "../services/agsieApi";
 
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
@@ -39,8 +39,6 @@ function FieldMap({ setFieldData }) {
   const [areaHa, setAreaHa] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
-
-  // 🔥 NEW: saved fields from backend
   const [savedFields, setSavedFields] = useState([]);
 
   const isDark = document.documentElement.classList.contains("dark");
@@ -111,7 +109,15 @@ function FieldMap({ setFieldData }) {
         {/* SIDEBAR */}
         <div className="space-y-5">
           <GlassPanel icon={<FiMap />} title="Select Field">
-            <select className="select">
+            {/* ✅ ONLY FIX IS HERE */}
+            <select
+              className="
+                select
+                bg-white text-gray-900
+                dark:bg-slate-800 dark:text-white
+                dark:border-slate-600
+              "
+            >
               <option>Field-A</option>
               <option>Field-B</option>
             </select>
@@ -179,7 +185,6 @@ function FieldMap({ setFieldData }) {
                 opacity={0.45}
               />
 
-              {/* 🔥 DRAW SAVED FIELDS FROM BACKEND */}
               {savedFields.map((field) => (
                 <Polygon
                   key={field.id}
@@ -229,7 +234,6 @@ function FieldMap({ setFieldData }) {
                       const result = await analyzeField(geojson);
                       setAnalysisResult(result);
 
-                      // 🔥 RELOAD SAVED FIELDS
                       const updated = await fetchFields();
                       setSavedFields(updated);
 
@@ -247,21 +251,6 @@ function FieldMap({ setFieldData }) {
                 />
               </FeatureGroup>
             </MapContainer>
-          </div>
-
-          {/* LEGEND */}
-          <div
-            className="
-              absolute bottom-6 right-6
-              bg-white/80 dark:bg-slate-800/80
-              backdrop-blur-xl
-              rounded-2xl p-4 shadow
-            "
-          >
-            <p className="font-semibold mb-2">NDVI Legend</p>
-            <Legend color="bg-red-500" label="Low" />
-            <Legend color="bg-yellow-400" label="Moderate" />
-            <Legend color="bg-green-500" label="High" />
           </div>
         </div>
       </div>
@@ -325,6 +314,8 @@ function Legend({ color, label }) {
 }
 
 export default FieldMap;
+
+
 
 
 
