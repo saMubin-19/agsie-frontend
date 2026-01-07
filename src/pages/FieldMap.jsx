@@ -1,5 +1,5 @@
 import * as turf from "@turf/turf";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FeatureGroup } from "react-leaflet";
 import { EditControl } from "react-leaflet-draw";
 import {
@@ -18,7 +18,7 @@ import {
   FiDownload,
 } from "react-icons/fi";
 
-import { analyzeField } from "../services/agsieApi"; // 🔥 BACKEND API
+import { analyzeField, fetchFields } from "../services/agsieApi"; // 🔥 BACKEND API
 
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
@@ -37,9 +37,27 @@ L.Icon.Default.mergeOptions({
 
 function FieldMap({ setFieldData }) {
   const [areaHa, setAreaHa] = useState(null);
-  const [analysisResult, setAnalysisResult] = useState(null); // 🔥 backend data
-  const [analyzing, setAnalyzing] = useState(false); // 🔥 loading
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  // 🔥 NEW: saved fields from backend
+  const [savedFields, setSavedFields] = useState([]);
+
   const isDark = document.documentElement.classList.contains("dark");
+
+  /* ================= LOAD SAVED FIELDS ================= */
+  useEffect(() => {
+    async function loadFields() {
+      try {
+        const data = await fetchFields();
+        setSavedFields(data);
+      } catch (err) {
+        console.error("Failed to load fields", err);
+      }
+    }
+
+    loadFields();
+  }, []);
 
   return (
     <div
@@ -161,21 +179,30 @@ function FieldMap({ setFieldData }) {
                 opacity={0.45}
               />
 
-              <Polygon
-                positions={[
-                  [23.72, 90.35],
-                  [23.72, 90.45],
-                  [23.65, 90.45],
-                  [23.65, 90.35],
-                ]}
-                pathOptions={{
-                  color: "#22c55e",
-                  weight: 3,
-                  fillOpacity: 0.25,
-                }}
-              >
-                <Popup>Farm Boundary</Popup>
-              </Polygon>
+              {/* 🔥 DRAW SAVED FIELDS FROM BACKEND */}
+              {savedFields.map((field) => (
+                <Polygon
+                  key={field.id}
+                  positions={field.geometry.coordinates[0].map(
+                    ([lng, lat]) => [lat, lng]
+                  )}
+                  pathOptions={{
+                    color:
+                      field.ndvi_status === "Healthy"
+                        ? "#22c55e"
+                        : field.ndvi_status === "Moderate"
+                        ? "#facc15"
+                        : "#ef4444",
+                    weight: 3,
+                    fillOpacity: 0.3,
+                  }}
+                >
+                  <Popup>
+                    <b>Area:</b> {field.area_hectares} ha <br />
+                    <b>NDVI:</b> {field.ndvi_status}
+                  </Popup>
+                </Polygon>
+              ))}
 
               <FeatureGroup>
                 <EditControl
@@ -192,7 +219,6 @@ function FieldMap({ setFieldData }) {
                   onCreated={async (e) => {
                     const geojson = e.layer.toGeoJSON();
 
-                    // frontend area calculation
                     const areaSqM = turf.area(geojson);
                     const hectares = (areaSqM / 10000).toFixed(2);
                     setAreaHa(hectares);
@@ -200,9 +226,12 @@ function FieldMap({ setFieldData }) {
                     try {
                       setAnalyzing(true);
 
-                      // 🔥 BACKEND ANALYSIS
                       const result = await analyzeField(geojson);
                       setAnalysisResult(result);
+
+                      // 🔥 RELOAD SAVED FIELDS
+                      const updated = await fetchFields();
+                      setSavedFields(updated);
 
                       setFieldData({
                         ...result,
@@ -296,6 +325,7 @@ function Legend({ color, label }) {
 }
 
 export default FieldMap;
+
 
 
 

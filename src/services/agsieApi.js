@@ -1,12 +1,12 @@
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+const API_BASE = "http://localhost:8000/api/v1";
 
-export async function analyzeField(geoJson) {
+export async function analyzeField(geojson) {
   const res = await fetch(`${API_BASE}/fields`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(geoJson),
+    body: JSON.stringify(geojson),
   });
 
   if (!res.ok) {
@@ -15,3 +15,12 @@ export async function analyzeField(geoJson) {
 
   return res.json();
 }
+
+export async function fetchFields() {
+  const res = await fetch(`${API_BASE}/fields`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch fields");
+  }
+  return res.json();
+}
+
