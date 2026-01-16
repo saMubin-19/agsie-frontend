@@ -1,6 +1,6 @@
 import * as turf from "@turf/turf";
 import { useState, useEffect } from "react";
-import { FeatureGroup } from "react-leaflet";
+import { FeatureGroup, useMap } from "react-leaflet";
 import { EditControl } from "react-leaflet-draw";
 import {
   MapContainer,
@@ -18,7 +18,11 @@ import {
   FiDownload,
 } from "react-icons/fi";
 
-import { analyzeField, fetchFields } from "../services/agsieApi";
+import {
+  analyzeField,
+  fetchFields,
+  deleteField, // 🔥 NEW
+} from "../services/agsieApi";
 
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
@@ -35,11 +39,32 @@ L.Icon.Default.mergeOptions({
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
+/* ================= MAP ZOOM HELPER ================= */
+function FlyToField({ geometry }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!geometry) return;
+
+    const coords = geometry.coordinates[0].map(
+      ([lng, lat]) => [lat, lng]
+    );
+
+    map.fitBounds(coords, { padding: [40, 40] });
+  }, [geometry, map]);
+
+  return null;
+}
+
 function FieldMap({ setFieldData }) {
   const [areaHa, setAreaHa] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [savedFields, setSavedFields] = useState([]);
+
+  /* Phase 4.3.4 */
+  const [selectedField, setSelectedField] = useState(null);
+  const [selectedFieldId, setSelectedFieldId] = useState("");
 
   const isDark = document.documentElement.classList.contains("dark");
 
@@ -56,6 +81,31 @@ function FieldMap({ setFieldData }) {
 
     loadFields();
   }, []);
+
+  /* ================= DELETE FIELD ================= */
+  const handleDeleteField = async () => {
+    if (!selectedField) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this field? This action cannot be undone."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteField(selectedField.id);
+
+      const updated = await fetchFields();
+      setSavedFields(updated);
+
+      setSelectedField(null);
+      setSelectedFieldId("");
+      setAreaHa(null);
+      setAnalysisResult(null);
+    } catch (err) {
+      alert("Failed to delete field");
+    }
+  };
 
   return (
     <div
@@ -109,8 +159,15 @@ function FieldMap({ setFieldData }) {
         {/* SIDEBAR */}
         <div className="space-y-5">
           <GlassPanel icon={<FiMap />} title="Select Field">
-            {/* ✅ ONLY FIX IS HERE */}
             <select
+              value={selectedFieldId}
+              onChange={(e) => {
+                const id = Number(e.target.value);
+                setSelectedFieldId(e.target.value);
+
+                const field = savedFields.find((f) => f.id === id);
+                setSelectedField(field || null);
+              }}
               className="
                 select
                 bg-white text-gray-900
@@ -118,8 +175,12 @@ function FieldMap({ setFieldData }) {
                 dark:border-slate-600
               "
             >
-              <option>Field-A</option>
-              <option>Field-B</option>
+              <option value="">Select a field</option>
+              {savedFields.map((field) => (
+                <option key={field.id} value={field.id}>
+                  Field #{field.id}
+                </option>
+              ))}
             </select>
           </GlassPanel>
 
@@ -130,19 +191,55 @@ function FieldMap({ setFieldData }) {
           </GlassPanel>
 
           <GlassPanel icon={<FiInfo />} title="Field Info">
-            <InfoRow label="Area" value={areaHa ? `${areaHa} ha` : "--"} />
+            <InfoRow
+              label="Area"
+              value={
+                selectedField
+                  ? `${selectedField.area_hectares} ha`
+                  : areaHa
+                  ? `${areaHa} ha`
+                  : "--"
+              }
+            />
             <InfoRow
               label="NDVI"
-              value={analysisResult?.ndvi_status || "--"}
+              value={
+                selectedField
+                  ? selectedField.ndvi_status
+                  : analysisResult?.ndvi_status || "--"
+              }
             />
             <InfoRow
               label="Recommendation"
-              value={analysisResult?.recommendation || "--"}
+              value={
+                selectedField
+                  ? selectedField.ndvi_status === "Healthy"
+                    ? "Maintain irrigation"
+                    : "Increase monitoring"
+                  : analysisResult?.recommendation || "--"
+              }
             />
+
             {analyzing && (
               <p className="text-xs text-emerald-500 mt-2">
                 Analyzing field…
               </p>
+            )}
+
+            {/* 🔥 DELETE BUTTON */}
+            {selectedField && (
+              <button
+                onClick={handleDeleteField}
+                className="
+                  mt-4 w-full flex items-center justify-center gap-2
+                  py-2 rounded-xl font-semibold
+                  bg-gradient-to-r from-red-500 to-rose-600
+                  text-white shadow
+                  hover:opacity-90 transition
+                "
+              >
+                🗑️ Delete Field
+              </button>
             )}
           </GlassPanel>
 
@@ -160,12 +257,7 @@ function FieldMap({ setFieldData }) {
 
         {/* MAP */}
         <div className="xl:col-span-3 relative">
-          <div
-            className="
-              h-[560px] rounded-3xl overflow-hidden
-              shadow-[0_40px_120px_rgba(0,0,0,0.25)]
-            "
-          >
+          <div className="h-[560px] rounded-3xl overflow-hidden shadow-[0_40px_120px_rgba(0,0,0,0.25)]">
             <MapContainer
               center={[23.685, 90.3563]}
               zoom={9}
@@ -185,6 +277,10 @@ function FieldMap({ setFieldData }) {
                 opacity={0.45}
               />
 
+              {selectedField && (
+                <FlyToField geometry={selectedField.geometry} />
+              )}
+
               {savedFields.map((field) => (
                 <Polygon
                   key={field.id}
@@ -198,8 +294,14 @@ function FieldMap({ setFieldData }) {
                         : field.ndvi_status === "Moderate"
                         ? "#facc15"
                         : "#ef4444",
-                    weight: 3,
+                    weight: selectedField?.id === field.id ? 5 : 3,
                     fillOpacity: 0.3,
+                  }}
+                  eventHandlers={{
+                    click: () => {
+                      setSelectedField(field);
+                      setSelectedFieldId(String(field.id));
+                    },
                   }}
                 >
                   <Popup>
@@ -222,8 +324,10 @@ function FieldMap({ setFieldData }) {
                   }}
                   edit={{ remove: true }}
                   onCreated={async (e) => {
-                    const geojson = e.layer.toGeoJSON();
+                    setSelectedField(null);
+                    setSelectedFieldId("");
 
+                    const geojson = e.layer.toGeoJSON();
                     const areaSqM = turf.area(geojson);
                     const hectares = (areaSqM / 10000).toFixed(2);
                     setAreaHa(hectares);
@@ -262,14 +366,7 @@ function FieldMap({ setFieldData }) {
 
 function GlassPanel({ icon, title, children }) {
   return (
-    <div
-      className="
-        bg-white/70 dark:bg-slate-800/70
-        backdrop-blur-xl
-        rounded-3xl p-5
-        shadow border border-white/40 dark:border-slate-700
-      "
-    >
+    <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl rounded-3xl p-5 shadow border border-white/40 dark:border-slate-700">
       <h3 className="flex items-center gap-2 font-semibold mb-4">
         <span className="text-emerald-500">{icon}</span>
         {title}
@@ -314,6 +411,10 @@ function Legend({ color, label }) {
 }
 
 export default FieldMap;
+
+
+
+
 
 
 
