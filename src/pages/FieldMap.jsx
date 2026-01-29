@@ -2,6 +2,15 @@ import * as turf from "@turf/turf";
 import { useState, useEffect } from "react";
 import { FeatureGroup, useMap } from "react-leaflet";
 import { EditControl } from "react-leaflet-draw";
+
+import {
+  analyzeField,
+  fetchFields,
+  deleteField,
+  exportFieldGeoJSON, // 🔥 NEW
+} from "../services/agsieApi";
+
+
 import {
   MapContainer,
   TileLayer,
@@ -17,12 +26,6 @@ import {
   FiInfo,
   FiDownload,
 } from "react-icons/fi";
-
-import {
-  analyzeField,
-  fetchFields,
-  deleteField, // 🔥 NEW
-} from "../services/agsieApi";
 
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
@@ -62,8 +65,39 @@ function FieldMap({ setFieldData }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [savedFields, setSavedFields] = useState([]);
 
-  /* Phase 4.3.4 */
   const [selectedField, setSelectedField] = useState(null);
+   
+   /* ================= EXPORT FIELD ================= */
+const handleExportField = async () => {
+  if (!selectedField) {
+    alert("Please select a field to export");
+    return;
+  }
+
+  try {
+    const geojson = await exportFieldGeoJSON(selectedField.id);
+
+    const blob = new Blob(
+      [JSON.stringify(geojson, null, 2)],
+      { type: "application/geo+json" }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `field-${selectedField.id}.geojson`;
+    document.body.appendChild(link);
+    link.click();
+
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert("Failed to export field");
+  }
+};
+
+
   const [selectedFieldId, setSelectedFieldId] = useState("");
 
   const isDark = document.documentElement.classList.contains("dark");
@@ -201,24 +235,35 @@ function FieldMap({ setFieldData }) {
                   : "--"
               }
             />
+    <InfoRow
+  label="NDVI"
+  value={
+    selectedField
+      ? selectedField.ndvi_status
+      : analysisResult?.ndvi_status || "--"
+  }
+/>
+
+
             <InfoRow
-              label="NDVI"
-              value={
-                selectedField
-                  ? selectedField.ndvi_status
-                  : analysisResult?.ndvi_status || "--"
-              }
-            />
-            <InfoRow
-              label="Recommendation"
-              value={
-                selectedField
-                  ? selectedField.ndvi_status === "Healthy"
-                    ? "Maintain irrigation"
-                    : "Increase monitoring"
-                  : analysisResult?.recommendation || "--"
-              }
-            />
+  label="Recommendation"
+  value={
+    selectedField
+      ? selectedField.ndvi_status === "Healthy"
+        ? "Maintain irrigation"
+        : selectedField.ndvi_status === "Moderate"
+        ? "Monitor crop stress"
+        : "Immediate action required"
+      : analysisResult
+      ? analysisResult.ndvi_status === "Healthy"
+        ? "Maintain irrigation"
+        : analysisResult.ndvi_status === "Moderate"
+        ? "Monitor crop stress"
+        : "Immediate action required"
+      : "--"
+  }
+/>
+
 
             {analyzing && (
               <p className="text-xs text-emerald-500 mt-2">
@@ -244,15 +289,21 @@ function FieldMap({ setFieldData }) {
           </GlassPanel>
 
           <button
-            className="
-              w-full py-2 rounded-xl flex items-center justify-center gap-2
-              bg-gray-100 dark:bg-slate-800
-              hover:bg-gray-200 dark:hover:bg-slate-700
-              font-semibold transition
-            "
-          >
-            <FiDownload /> Export Map
-          </button>
+  onClick={handleExportField}
+  disabled={!selectedField}
+  className={`
+    w-full py-2 rounded-xl flex items-center justify-center gap-2
+    font-semibold transition
+    ${
+      selectedField
+        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+        : "bg-gray-200 dark:bg-slate-700 text-gray-400 cursor-not-allowed"
+    }
+  `}
+>
+  <FiDownload /> Export GeoJSON
+</button>
+
         </div>
 
         {/* MAP */}
@@ -410,10 +461,8 @@ function Legend({ color, label }) {
   );
 }
 
-export default FieldMap;
-
-
-
+export default FieldMap; 
+ 
 
 
 
