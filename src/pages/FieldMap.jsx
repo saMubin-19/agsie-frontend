@@ -7,7 +7,8 @@ import {
   analyzeField,
   fetchFields,
   deleteField,
-  exportFieldGeoJSON, // 🔥 NEW
+  exportFieldGeoJSON,
+  exportFieldShapefile,
 } from "../services/agsieApi";
 
 
@@ -115,6 +116,33 @@ const handleExportField = async () => {
 
     loadFields();
   }, []);
+
+  
+  const handleExportShapefile = async () => {
+  if (!selectedField) {
+    alert("Please select a field to export");
+    return;
+  }
+
+  try {
+    const blob = await exportFieldShapefile(selectedField.id);
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `field-${selectedField.id}.zip`;
+
+    document.body.appendChild(link);
+    link.click();
+
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert("Failed to export Shapefile");
+  }
+};
+
 
   /* ================= DELETE FIELD ================= */
   const handleDeleteField = async () => {
@@ -304,7 +332,26 @@ const handleExportField = async () => {
   <FiDownload /> Export GeoJSON
 </button>
 
+<button
+  onClick={handleExportShapefile}
+  disabled={!selectedField}
+  className={`
+    w-full py-2 rounded-xl flex items-center justify-center gap-2
+    font-semibold transition
+    ${
+      selectedField
+        ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+        : "bg-gray-200 dark:bg-slate-700 text-gray-400 cursor-not-allowed"
+    }
+  `}
+>
+  🗺️ Export Shapefile
+</button>
+
+
         </div>
+
+
 
         {/* MAP */}
         <div className="xl:col-span-3 relative">
