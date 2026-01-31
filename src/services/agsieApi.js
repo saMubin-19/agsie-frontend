@@ -49,5 +49,17 @@ export async function exportFieldGeoJSON(id) {
   return res.json();
 }
 
+/* Export Shape file (Zip) */
+export async function exportFieldShapefile(id) {
+  const res = await fetch(
+    `${API_BASE}/fields/${id}/export/shapefile`
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed to export Shapefile");
+  }
+
+  return res.blob(); // IMPORTANT
+}
 
 
