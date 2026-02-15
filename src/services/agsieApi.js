@@ -62,4 +62,20 @@ export async function exportFieldShapefile(id) {
   return res.blob(); // IMPORTANT
 }
 
+/* 🔥 UPDATE FIELD (PATCH) */
+export async function updateField(id, geojson) {
+  const res = await fetch(`${API_BASE}/fields/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(geojson),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to update field");
+  }
+
+  return res.json();
+}
 
