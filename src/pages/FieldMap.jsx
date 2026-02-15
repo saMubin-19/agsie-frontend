@@ -412,46 +412,84 @@ const handleExportField = async () => {
 
               <FeatureGroup>
                 <EditControl
-                  position="topright"
-                  draw={{
-                    rectangle: false,
-                    circle: false,
-                    circlemarker: false,
-                    marker: false,
-                    polyline: false,
-                    polygon: true,
-                  }}
-                  edit={{ remove: true }}
-                  onCreated={async (e) => {
-                    setSelectedField(null);
-                    setSelectedFieldId("");
+  position="topright"
+  draw={{
+    rectangle: false,
+    circle: false,
+    circlemarker: false,
+    marker: false,
+    polyline: false,
+    polygon: true,
+  }}
+  edit={{ remove: false }}
 
-                    const geojson = e.layer.toGeoJSON();
-                    const areaSqM = turf.area(geojson);
-                    const hectares = (areaSqM / 10000).toFixed(2);
-                    setAreaHa(hectares);
+ onCreated={async (e) => {
+  setSelectedField(null);
+  setSelectedFieldId("");
 
-                    try {
-                      setAnalyzing(true);
+  const geojson = e.layer.toGeoJSON();
+  const areaSqM = turf.area(geojson);
+  const hectares = (areaSqM / 10000).toFixed(2);
+  setAreaHa(hectares);
 
-                      const result = await analyzeField(geojson);
-                      setAnalysisResult(result);
+  try {
+    setAnalyzing(true);
 
-                      const updated = await fetchFields();
-                      setSavedFields(updated);
+    const result = await analyzeField(geojson);
+    setAnalysisResult(result);
 
-                      setFieldData({
-                        ...result,
-                        areaHa: hectares,
-                        geojson,
-                      });
-                    } catch (err) {
-                      alert("Backend analysis failed");
-                    } finally {
-                      setAnalyzing(false);
-                    }
-                  }}
-                />
+    const updated = await fetchFields();
+    setSavedFields(updated);
+
+    setFieldData({
+      ...result,
+      areaHa: hectares,
+      geojson,
+    });
+  } catch (err) {
+    alert("Backend analysis failed");
+  } finally {
+    setAnalyzing(false);
+  }
+}}
+
+
+  onEdited={async (e) => {
+    const layers = e.layers;
+
+    layers.eachLayer((layer) => {
+  const geojson = layer.toGeoJSON();
+
+  if (!selectedField) {
+    alert("Select a field before editing");
+    return;
+  }
+
+  (async () => {
+    try {
+      setAnalyzing(true);
+
+      await updateField(selectedField.id, geojson);
+
+      const updated = await fetchFields();
+      setSavedFields(updated);
+
+      const refreshed = updated.find(
+        (f) => f.id === selectedField.id
+      );
+      setSelectedField(refreshed);
+
+      alert("Field updated successfully");
+    } catch (err) {
+      alert("Failed to update field");
+    } finally {
+      setAnalyzing(false);
+    }
+  })();
+});
+  }}
+/>
+
               </FeatureGroup>
             </MapContainer>
           </div>
