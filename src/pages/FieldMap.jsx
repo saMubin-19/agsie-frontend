@@ -9,6 +9,7 @@ import {
   deleteField,
   exportFieldGeoJSON,
   exportFieldShapefile,
+  updateField,
 } from "../services/agsieApi";
 
 
